@@ -4,9 +4,9 @@ plugins {
 
 }
 
-//application {
-//    mainClassName = "demo"
-//}
+application {
+    mainClassName = ".AppKt"
+}
 dependencies {
 
     compile("org.jetbrains.kotlin", "kotlin-stdlib", "1.3.50")
@@ -18,8 +18,9 @@ repositories {
 
         url = uri("http://maven.aliyun.com/nexus/content/groups/public/")
         url = uri("http://maven.aliyun.com/nexus/content/repositories/jcenter")
-        mavenCentral()
         url = uri("https://jitpack.io")
+        mavenCentral()
+
     }
 
 
@@ -27,11 +28,11 @@ repositories {
 buildscript {
     repositories {
         maven {
-            mavenCentral()
+
             url = uri("https://jitpack.io")
             url = uri("http://maven.aliyun.com/nexus/content/groups/public/")
             url = uri("http://maven.aliyun.com/nexus/content/repositories/jcenter")
-
+            mavenCentral()
         }
 
 

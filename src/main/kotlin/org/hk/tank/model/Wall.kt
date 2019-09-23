@@ -1,9 +1,12 @@
 package org.hk.tank.model
 
 import org.hk.tank.Config
+import org.hk.tank.business.Blockable
 import org.itheima.kotlin.game.core.Painter
-
-class Wall (override val x: Int, override val y: Int):IView{
+/**
+ *
+ * */
+class Wall (override val x: Int, override val y: Int):Blockable{
 
     //宽高
     override  var width:Int= Config.block
