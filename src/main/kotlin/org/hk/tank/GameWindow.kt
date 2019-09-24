@@ -5,19 +5,22 @@ import javafx.scene.input.KeyEvent
 import org.hk.tank.Config.block
 import org.hk.tank.Config.gameHeight
 import org.hk.tank.Config.gameWidth
-import org.hk.tank.business.Blockable
-import org.hk.tank.business.Movable
+import org.hk.tank.business.*
 import org.hk.tank.enums.Direction
 import org.hk.tank.model.*
 import org.itheima.kotlin.game.core.Composer
 import org.itheima.kotlin.game.core.Painter
 import org.itheima.kotlin.game.core.Window
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+import javax.security.auth.Destroyable
 
 class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHeight) {
 
     //管理元素的集合
-    private val views = arrayListOf<IView>()
+//    private val views = arrayListOf<IView>()
+    //线程安全的集合
+    private val views = CopyOnWriteArrayList<IView>()
     private lateinit var tank: Tank
     override fun onCreate() {
         //地图
@@ -37,6 +40,7 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
                     '铁' -> views.add(Steel(columnNum * block, lineNum * block))
                     '草' -> views.add(Grass(columnNum * block, lineNum * block))
                     '水' -> views.add(Water(columnNum * block, lineNum * block))
+                    '敌' -> views.add(Enemy(columnNum * block, lineNum * block))
                 }
                 columnNum++
             }
@@ -53,7 +57,6 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
         views.forEach {
             it.draw()
         }
-
     }
 
 
@@ -72,6 +75,12 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
             KeyCode.D -> {
                 tank.move(Direction.RIGHT)
             }
+            KeyCode.ENTER -> {
+                //发射子弹
+                val bullet = tank.shot()
+
+                views.add(bullet)
+            }
         }
 
     }
@@ -86,8 +95,8 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
 
             var badDirection: Direction? = null
             var badBlock: Blockable? = null
-
-            val blocks = views.filter { it is Blockable }.forEach blockTag@{ block ->
+            //不要和自己比较
+            val blocks = views.filter { (it is Blockable) and (move != it) }.forEach blockTag@{ block ->
                 //3遍历集合，找到是否发生碰撞
 //                move 和 block是否碰撞
 
@@ -95,17 +104,68 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
                 val direction = move.willCollision(block)
                 direction?.let {
                     //移动的发现碰撞，跳出当前循环
-                    badDirection=direction
-                    badBlock=block
+                    badDirection = direction
+                    badBlock = block
                     return@blockTag
                 }
             }
 
             //找到和move碰撞的block，找到会碰撞的方向
             //通知可以移动的物体，会在哪个方向和哪个物体碰撞
-            move.notifyCollision(badDirection,badBlock)
+            move.notifyCollision(badDirection, badBlock)
         }
 
+        //检测自动移动能力的物体，让他们自己动起来
+        views.filter { it is AutoMovable }.forEach {
+            (it as AutoMovable).autoMove()
+        }
 
+        //检测销毁
+        views.filter { it is org.hk.tank.business.Destroyable }.forEach {
+            //判断具备销毁能力
+
+            if ((it as org.hk.tank.business.Destroyable).isDestroyed()) {
+                views.remove(it)
+            }
+
+
+        }
+
+        //检测 具备攻击能力和被攻击能力的物体间是否产生碰撞
+        //1)过滤具备攻击能力的
+        views.filter { it is Attackable }.forEach { attack ->
+            attack as Attackable
+
+            //2)过滤 受攻击能力的 攻击方的源不可以是发射方
+            views.filter { (it is Sufferable) and (attack.owner != it) }.forEach sufferTag@{ suffer ->
+                suffer as Sufferable
+                //3)判断是否产生碰撞
+                if (attack.isCollision(suffer)) {
+                    //产生碰撞，找到碰撞者
+                    //通知攻击者 产生碰撞
+                    attack.notifyAttack(suffer)
+
+                    //通知被攻击者，产生碰撞
+                    val sufferView: Array<IView>? = suffer.notifySuffer(attack)
+                    sufferView?.let {
+                        //显示挨打的效果
+                        views.addAll(sufferView)
+                    }
+
+
+                    return@sufferTag
+                }
+            }
+        }
+
+        //检测自动射击
+        views.filter { it is AutoShot }.forEach {
+            it as AutoShot
+            val shot = it.autoShot()
+            shot?.let {
+                views.add(shot)
+            }
+
+        }
     }
 }

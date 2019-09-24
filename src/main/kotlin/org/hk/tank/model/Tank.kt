@@ -1,17 +1,18 @@
 package org.hk.tank.model
 
 import org.hk.tank.Config
+import org.hk.tank.business.Attackable
 import org.hk.tank.business.Blockable
 import org.hk.tank.business.Movable
+import org.hk.tank.business.Sufferable
 import org.hk.tank.enums.Direction
 import org.itheima.kotlin.game.core.Painter
-import javax.swing.text.View
 
 /**
  * 我方坦克
  * 具备移动能力
  * */
-class Tank(override var x: Int, override var y: Int) : Movable {
+class Tank(override var x: Int, override var y: Int) : Movable, Blockable, Sufferable {
 
 
     override var width: Int = Config.block
@@ -20,6 +21,12 @@ class Tank(override var x: Int, override var y: Int) : Movable {
     override var speed: Int = 8
     //坦克不可以走的方向
     private var badDirection: Direction? = null
+    override var boold: Int = 20
+
+    override fun notifySuffer(attackable: Attackable): Array<IView>? {
+        boold -= attackable.attackPower
+        return arrayOf(Blast(x, y))
+    }
 
     override fun draw() {
 
@@ -92,24 +99,63 @@ class Tank(override var x: Int, override var y: Int) : Movable {
             Direction.RIGHT -> x += speed
         }
 
-        val collision = when {
-            block.y + block.height <= y -> //如果 阻挡物在运动物体上方时,不碰撞
-                false
-            y + height <= block.y -> //如果 阻挡物在运动物体下方时,不碰撞
-                false
-            block.x + block.width <= x -> //如果 阻挡物在运动物体左边时,不碰撞
-                false
-            x + width <= block.x -> //如果 阻挡物在运动物体右方时,不碰撞
-                false
-            else -> //碰撞
-                true
-        }
-        return if (collision) currentDirection else null
+        val checkCollision = checkCollision(block.x, block.y, block.width, block.height, x, y, width, height)
+        return if (checkCollision) currentDirection else null
 
     }
 
     override fun notifyCollision(direction: Direction?, block: Blockable?) {
         //TODO：接收到碰撞信息
         this.badDirection = direction
+    }
+
+    //发射子弹的方法
+    fun shot(): Bullet {
+
+
+//        return Bullet(currentDirection,bulletX,bulletY)
+        return Bullet(this,currentDirection) { bulletWidth, bulletHeight ->
+
+            //计算子弹真实的坐标
+            val tankX = x
+            val tankY = y
+            val tankWidth = width
+            val tankHeight = height
+            // 如果坦克是向上的
+            //bulletX=tankX+(tankWidth-bullWidth)/2
+            //bulletY=tankY-bulletHeight/2
+            var bulletX = 0
+            var bulletY = 0
+
+//            var bulletWidth = 16//不写死，由子弹自身决定
+//            var bulletHeight = 32
+
+            when (currentDirection) {
+                Direction.UP -> {
+                    bulletX = tankX + (tankWidth - bulletWidth) / 2
+                    bulletY = tankY - bulletHeight / 2
+                }
+
+                Direction.DOWN -> {
+                    bulletX = tankX + (tankWidth - bulletWidth) / 2
+                    bulletY = tankY + tankHeight - bulletHeight / 2
+                }
+
+                Direction.LEFT -> {
+                    bulletX = tankX - tankWidth / 2
+                    bulletY = tankY + (tankHeight - bulletHeight) / 2
+                }
+
+                Direction.RIGHT -> {
+                    bulletX = tankX + tankWidth - bulletWidth / 2
+                    bulletY = tankY + (tankHeight - bulletHeight) / 2
+                }
+            }
+
+
+
+
+            Pair(bulletX, bulletY)
+        }
     }
 }
