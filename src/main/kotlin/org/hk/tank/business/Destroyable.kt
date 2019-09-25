@@ -10,4 +10,8 @@ interface Destroyable:IView {
      *
      * */
     fun isDestroyed():Boolean
+
+    fun showDestroy(): Array<IView>?{
+        return null
+    }
 }

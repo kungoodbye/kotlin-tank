@@ -14,9 +14,13 @@ import javax.swing.text.View
  * 子弹
  * create()函数返回两个值，是x，y
  * */
-class Bullet(override val owner: IView,override val currentDirection: Direction, create: (width: Int, height: Int) -> Pair<Int, Int>)
+class Bullet(override val owner: IView, override val currentDirection: Direction, create: (width: Int, height: Int) -> Pair<Int, Int>)
     : AutoMovable
-        , Destroyable, Attackable {
+        , Destroyable, Attackable, Sufferable {
+    override val boold: Int = 1
+
+
+
     override val attackPower: Int = 1
 
     //给子弹一个方向,方向由坦克来决定的
@@ -84,6 +88,14 @@ class Bullet(override val owner: IView,override val currentDirection: Direction,
     }
 
     override fun notifyAttack(sufferable: Sufferable) {
-        isDestroyed = true
+        //自己人打自己人子弹不消失
+        isDestroyed =
+                if ((sufferable is Enemy) and (this.owner is Enemy)) {
+                    false
+                } else !((sufferable is Tank) and (this.owner is Tank))
+    }
+
+    override fun notifySuffer(attackable: Attackable): Array<IView>? {
+        return null
     }
 }

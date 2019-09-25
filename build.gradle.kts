@@ -4,9 +4,11 @@ plugins {
 
 }
 
-application {
-    mainClassName = ".AppKt"
+application{
+    mainClassName=".AppKt"
 }
+
+
 dependencies {
 
     compile("org.jetbrains.kotlin", "kotlin-stdlib", "1.3.50")

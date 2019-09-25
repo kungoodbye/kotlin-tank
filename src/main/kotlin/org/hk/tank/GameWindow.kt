@@ -22,6 +22,17 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
     //线程安全的集合
     private val views = CopyOnWriteArrayList<IView>()
     private lateinit var tank: Tank
+    //游戏是否结束
+    private var gameOver: Boolean = false
+    //敌方坦克数量
+    private var enemyTotalSize = 8
+    //敌方坦克显示的多少
+    private var enmeyActiveSize = 4
+    //敌方的初始点
+    private val enemyBornLocation = arrayListOf<Pair<Int, Int>>()
+    //出生地点下标
+    private var bornIndex = 0
+
     override fun onCreate() {
         //地图
         //通过读文件的方事创建地图
@@ -40,7 +51,10 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
                     '铁' -> views.add(Steel(columnNum * block, lineNum * block))
                     '草' -> views.add(Grass(columnNum * block, lineNum * block))
                     '水' -> views.add(Water(columnNum * block, lineNum * block))
-                    '敌' -> views.add(Enemy(columnNum * block, lineNum * block))
+                    '敌' -> {
+                        enemyBornLocation.add(Pair(columnNum * Config.block, lineNum * Config.block))
+                        views.add(Enemy(columnNum * block, lineNum * block))
+                    }
                 }
                 columnNum++
             }
@@ -50,6 +64,10 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
         //添加我方的坦克
         tank = Tank(block * 10, block * 12)
         views.add(tank)
+
+
+        //添加大本营
+        views.add(Camp(Config.gameWidth / 2 - Config.block, Config.gameHeight - 96))
     }
 
     override fun onDisplay() {
@@ -61,32 +79,64 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
 
 
     override fun onKeyPressed(event: KeyEvent) {
-        println("${event.code}")
-        when (event.code) {
-            KeyCode.W -> {
-                tank.move(Direction.UP)
-            }
-            KeyCode.S -> {
-                tank.move(Direction.DOWN)
-            }
-            KeyCode.A -> {
-                tank.move(Direction.LEFT)
-            }
-            KeyCode.D -> {
-                tank.move(Direction.RIGHT)
-            }
-            KeyCode.ENTER -> {
-                //发射子弹
-                val bullet = tank.shot()
+        if (!gameOver) {
+            when (event.code) {
+                KeyCode.W -> {
+                    tank.move(Direction.UP)
+                }
+                KeyCode.S -> {
+                    tank.move(Direction.DOWN)
+                }
+                KeyCode.A -> {
+                    tank.move(Direction.LEFT)
+                }
+                KeyCode.D -> {
+                    tank.move(Direction.RIGHT)
+                }
+                KeyCode.ENTER -> {
+                    //发射子弹
+                    val bullet = tank.shot()
 
-                views.add(bullet)
+                    views.add(bullet)
+                }
+                else -> {}
             }
         }
-
     }
 
     override fun onRefresh() {
         //业务逻辑
+
+        //业务逻辑
+
+        //先判断是否被销毁再判断游戏是否结束
+        /**
+         * 检测依据被销毁的移除
+         */
+        views.filter { it is org.hk.tank.business.Destroyable }.forEach {
+            if ((it as org.hk.tank.business.Destroyable).isDestroyed()) {
+                views.remove(it)
+
+                //  检测敌方坦克被销毁
+                if (it is Enemy) {
+                    enemyTotalSize--
+                }
+
+                //只有大本营
+                val destroy = it.showDestroy()
+                destroy?.let {
+                    views.addAll(destroy)
+                }
+
+
+            }
+
+
+        }
+
+        if (gameOver) return
+
+
         //判断运动的物体和阻塞物体是否发生碰撞
         //1.找到运动的物体
         val moves = views.filter { it is Movable }.forEach { move ->
@@ -137,7 +187,7 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
             attack as Attackable
 
             //2)过滤 受攻击能力的 攻击方的源不可以是发射方
-            views.filter { (it is Sufferable) and (attack.owner != it) }.forEach sufferTag@{ suffer ->
+            views.filter { (it is Sufferable) and (attack.owner != it) and (attack != it) }.forEach sufferTag@{ suffer ->
                 suffer as Sufferable
                 //3)判断是否产生碰撞
                 if (attack.isCollision(suffer)) {
@@ -166,6 +216,42 @@ class GameWindow : Window("坦克大战", "main/img/logo.jpg", gameWidth, gameHe
                 views.add(shot)
             }
 
+        }
+        //判断大本营是否存在 或者敌方坦克是否都消失了
+        if (views.none { it is Camp } or
+                (enemyTotalSize <= 0) or
+                views.none { it is Tank }) {
+            gameOver = true
+        }
+
+        //去生成新的坦克
+        if ((enemyTotalSize - enmeyActiveSize >= 0) and
+                (views.filter { it is Enemy }.size < enmeyActiveSize)) {
+
+            //找到坦克的出生地
+            val index = bornIndex % enemyBornLocation.size
+            val pair = enemyBornLocation[index]
+            val born = Born(pair.first, pair.second)
+
+            //生产敌机
+            //是否生产
+            var show = true
+            views.filter { it is Movable }.forEach bornTag@{ move ->
+                move as Movable
+                //println("生产基地:(${born.x},${born.y})")
+                //println("坦克的地址:(${move.x},${move.y},${move.currentDirection})")
+                //println("是否可以生产${born.isBorn(move)}")
+                if (!born.isBorn(move)) {
+                    show = false
+                    return@bornTag
+                }
+            }
+
+            if (show) {
+                val enemy = Enemy(born.x, born.y)
+                views.add(enemy)
+                bornIndex++
+            }
         }
     }
 }
